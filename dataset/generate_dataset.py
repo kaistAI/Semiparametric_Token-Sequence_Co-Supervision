@@ -4,9 +4,34 @@ from typing import Optional, Dict, Sequence
 from dataclasses import dataclass, field
 
 import transformers
-import json, tqdm, copy
+import json, copy
+from tqdm import tqdm
 from utils.dataset_utils import add_instruction_rettoken
 IGNORE_INDEX = -100
+TASK_INST = {
+    "wow": "Given a chat history separated by new lines, generates an informative, knowledgeable and engaging response. ",
+    #  "fever": "Is the following statement correct or not? Say true if it's correct; otherwise say false",
+    "fever": "Is the following statement correct or not? Say supports if it's correct; otherwise say refutes. Also provide the evidence.",
+    "eli5": "Provide a paragraph-length response using simple words to answer the following question.",
+    "nq": "Answer the following question with corresponding evidence.",
+    "triviaqa": "Answer the following question with corresponding evidence.",
+    "zsre": "Find the correct entity given subject and relation with corresponding evidence.",
+    "trex": "Find the correct object given subject and relation with corresponding evidence.",
+    "obqa": "Given four answer candidates, A, B, C and D, choose the best answer choice.",
+    "arc_easy": "Given four answer candidates, A, B, C and D, choose the best answer choice.",
+    "arc_c": "Given four answer candidates, A, B, C and D, choose the best answer choice.",
+    "asqa": "Answer the following question. The question may be ambiguous and have multiple correct answers, and in that case, you have to provide a long-form answer including all correct answers.",
+    "qampari": "Provide a list of accurate answers for the given question using only the provided search results (some of which might be irrelevant) and cite them properly. Always cite one and only one document for each answer. Separate answers by commas. For questions that have more than 5 answers, write at least 5 answers.",
+    "musique": "Answer question that require multiple reasoning steps where each reasoning steps have corresponding evidence.",
+    "strategyqa": "Answer question in which the required reasoning steps are implicit in the question.",
+    "hotpotqa_distractor": "Answer question that require 2 step reasoning where each reasoning steps have corresponding evidence.",
+    "hotpotqa": "Answer question that require 2 step reasoning where each reasoning steps have corresponding evidence.",
+    "hotpotqa_distractor_no_inst": "",
+    "musique_no_inst": "",
+    "hotpotqa_full": "Answer question that require 2 step reasoning where each reasoning steps have corresponding evidence.",
+    "hotpotqa_full_no_inst": "",
+    "strategyqa_no_inst": "",
+}
 
 def do_mask(type):
     if type == "no_mask":
@@ -156,6 +181,240 @@ def get_mask_idx(input_ids, tokenizer):
     return mask_idx
 
 
+class ALCE_Top100_Dataset(Dataset):
+    """Dataset for supervised fine-tuning."""
+
+    def __init__(
+        self,
+        ctx_tokenizer: transformers.PreTrainedTokenizer,
+        question_tokenizer: transformers.PreTrainedTokenizer,
+        dataset_config,
+    ):
+        super(ALCE_Top100_Dataset, self).__init__()
+        instructions = TASK_INST[dataset_config.task]
+        input_path = dataset_config.eval_data
+        if input_path.endswith(".json"):
+            input_data = json.load(open(input_path))
+        else:
+            import jsonlines
+
+            with jsonlines.open(input_path, "r") as jsonl_f:
+                input_data = [obj for obj in jsonl_f]
+
+        if dataset_config.rag_ctx_q:
+            self.prompt = _tokenize_fn(
+                tqdm(
+                    [
+                        instructions
+                        + "## Context: [Ret]"
+                        + item["docs"][0]["text"]
+                        + "## Input:\n\n"
+                        + item["question"]
+                        + "## Output:\n\n"
+                        for item in input_data
+                    ]
+                ),
+                question_tokenizer,
+            )["input_ids"]
+        elif dataset_config.rag_q_ctx:
+            self.prompt = _tokenize_fn(
+                tqdm(
+                    [
+                        instructions
+                        + "## Input:\n\n"
+                        + item["question"]
+                        + "## Context: [Ret]"
+                        + item["docs"][0]["text"]
+                        + "## Output:\n\n"
+                        for item in input_data
+                    ]
+                ),
+                question_tokenizer,
+            )["input_ids"]
+        else:
+            self.prompt = _tokenize_fn(
+                tqdm(
+                    [
+                        instructions
+                        + "## Input:\n\n"
+                        + item["question"]
+                        + "## Output:\n\n"
+                        for item in input_data
+                    ]
+                ),
+                question_tokenizer,
+            )["input_ids"]
+
+        self.ids = [
+            [doc["id"] for doc in item["docs"][: dataset_config.ndocs]]
+            for item in input_data
+        ]
+
+    def __len__(self):
+        return len(self.prompt)
+
+    def __getitem__(self, i) -> Dict[str, torch.Tensor]:
+        return dict(
+            input_ids=self.prompt[i],
+            target_labels=self.ids[i],
+            alce_idx=i,
+        )
+
+
+class ALCE_Top100_FullDataset(Dataset):
+    """Dataset for supervised fine-tuning."""
+
+    def __init__(
+        self,
+        ctx_tokenizer: transformers.PreTrainedTokenizer,
+        question_tokenizer: transformers.PreTrainedTokenizer,
+        dataset_config,
+    ):
+        super(ALCE_Top100_FullDataset, self).__init__()
+        instructions = TASK_INST[dataset_config.task]
+        input_path = dataset_config.eval_data
+        if input_path.endswith(".json"):
+            input_data = json.load(open(input_path))
+        else:
+            import jsonlines
+
+            with jsonlines.open(input_path, "r") as jsonl_f:
+                input_data = [obj for obj in jsonl_f]
+        if dataset_config.rag_ctx_q:
+            self.prompt = _tokenize_fn(
+                tqdm(
+                    [
+                        instructions
+                        + "## Context: [Ret]"
+                        + item["docs"][0]["text"]
+                        + "## Input:\n\n"
+                        + item["question"]
+                        + "## Output:\n\n"
+                        for item in input_data
+                    ]
+                ),
+                question_tokenizer,
+            )["input_ids"]
+        elif dataset_config.rag_q_ctx:
+            self.prompt = _tokenize_fn(
+                tqdm(
+                    [
+                        instructions
+                        + "## Input:\n\n"
+                        + item["question"]
+                        + "## Context: [Ret]"
+                        + item["docs"][0]["text"]
+                        + "## Output:\n\n"
+                        for item in input_data
+                    ]
+                ),
+                question_tokenizer,
+            )["input_ids"]
+        else:
+            self.prompt = _tokenize_fn(
+                tqdm(
+                    [
+                        instructions
+                        + "## Input:\n\n"
+                        + item["question"]
+                        + "## Output:\n\n"
+                        for item in input_data
+                    ]
+                ),
+                question_tokenizer,
+            )["input_ids"]
+
+        self.ids = []
+        for elem in json.load(open(dataset_config.eval_docs)):
+            self.ids.append(elem["id"])
+
+    def __len__(self):
+        return len(self.prompt)
+
+    def __getitem__(self, i) -> Dict[str, torch.Tensor]:
+        return dict(
+            input_ids=self.prompt[i],
+            target_labels=self.ids,
+            alce_idx=i,
+        )
+
+
+class ALCE_Top100_FullEmbedDataset(Dataset):
+    """Dataset for supervised fine-tuning."""
+
+    def __init__(
+        self,
+        ctx_tokenizer: transformers.PreTrainedTokenizer,
+        question_tokenizer: transformers.PreTrainedTokenizer,
+        dataset_config,
+    ):
+        super(ALCE_Top100_FullEmbedDataset, self).__init__()
+        input_path = dataset_config.eval_docs
+        if input_path.endswith(".json"):
+            input_data = json.load(open(input_path))
+        else:
+            assert False
+            import jsonlines
+
+            with jsonlines.open(input_path, "r") as jsonl_f:
+                input_data = [obj for obj in jsonl_f]
+        input_dict = {}
+        for doc in input_data:
+            if "title" in doc.keys():
+                input_dict[doc["id"]] = f"{doc['title']} :: {doc['text']}"
+            else:
+                input_dict[doc["id"]] = doc["text"]
+        print(f"# of doc: {len(input_dict)}")
+        self.ids = list(input_dict.keys())
+        self.ctx = _tokenize_fn(tqdm(list(input_dict.values())), ctx_tokenizer)[
+            "input_ids"
+        ]
+
+    def __len__(self):
+        return len(self.ids)
+
+    def __getitem__(self, i) -> Dict[str, torch.Tensor]:
+        return dict(
+            input_ids=self.ctx[i], target_labels=self.ids[i]
+        )
+
+
+class ALCE_Top100_EmbedDataset(Dataset):
+    """Dataset for supervised fine-tuning."""
+
+    def __init__(
+        self,
+        ctx_tokenizer: transformers.PreTrainedTokenizer,
+        question_tokenizer: transformers.PreTrainedTokenizer,
+        dataset_config,
+    ):
+        super(ALCE_Top100_EmbedDataset, self).__init__()
+        input_path = dataset_config.eval_data
+        if input_path.endswith(".json"):
+            input_data = json.load(open(input_path))
+        else:
+            import jsonlines
+
+            with jsonlines.open(input_path, "r") as jsonl_f:
+                input_data = [obj for obj in jsonl_f]
+        input_dict = {}
+        for item in input_data:
+            for doc in item["docs"][: dataset_config.ndocs]:
+                input_dict[doc["id"]] = doc["text"]
+        self.ids = list(input_dict.keys())
+        self.ctx = _tokenize_fn(tqdm(list(input_dict.values())), ctx_tokenizer)[
+            "input_ids"
+        ]
+
+    def __len__(self):
+        return len(self.ids)
+
+    def __getitem__(self, i) -> Dict[str, torch.Tensor]:
+        return dict(
+            input_ids=self.ctx[i], target_labels=self.ids[i]
+        )
+
+
 class TrainDataset(Dataset):
     """Dataset for supervised fine-tuning."""
 
@@ -170,11 +429,8 @@ class TrainDataset(Dataset):
         data_path = dataset_config.train_data_path
         ids2text = json.load(open(dataset_config.train_ids2text))
         loss_mask_context = dataset_config.loss_mask_context
-        data_type = dataset_config.train_data_type
         list_data_dict = add_instruction_rettoken(
             data_path,
-            data_type,
-            dataset_config.do_swap,
             dataset_config,
         ) 
         sources = [
@@ -264,7 +520,6 @@ class TrainDataset(Dataset):
                 input_ids=self.input_ids[i],
                 labels=self.labels[i],
                 target_labels=self.target_labels[i],
-                dataset_type=self.dataset_type,
                 mask_idx=self.mask_idx[i]
             )
         elif self.hard_neg_ids is None:
@@ -275,7 +530,6 @@ class TrainDataset(Dataset):
                 target_idxs=self.target_idxs[i],
                 target_labels=self.target_labels[i],
                 mask_idx=self.mask_idx[i],
-                dataset_type=self.dataset_type,
             )
         else:
             return dict(
@@ -287,7 +541,6 @@ class TrainDataset(Dataset):
                 target_labels=self.target_labels[i],
                 hard_neg_labels=self.hard_neg_labels[i],
                 mask_idx=self.mask_idx[i],
-                dataset_type=self.dataset_type,
             )
 
 @dataclass
@@ -383,7 +636,7 @@ class DataCollator(object):
                 )
             else:
                 if "labels" in instances[0]:
-                    input_ids, labels, target_labels, dataset_type = tuple(
+                    input_ids, labels, target_labels = tuple(
                         [instance[key] for instance in instances]
                         for key in (
                             "input_ids",
@@ -411,6 +664,11 @@ class DataCollator(object):
             batch_first=True,
             padding_value=self.question_tokenizer.pad_token_id,
         )
+        alce_idx = (
+            [instance["alce_idx"] for instance in instances]
+            if "alce_idx" in instances[0]
+            else None
+        )
         mask_idx = (
             [instance["mask_idx"] for instance in instances]
             if "mask_idx" in instances[0]
@@ -432,6 +690,7 @@ class DataCollator(object):
             if hard_neg_ids != None
             else None,
             hard_neg_labels=hard_neg_labels,
+            alce_idx=alce_idx
         )
 
 def train_data_module(
@@ -444,12 +703,50 @@ def train_data_module(
         ctx_tokenizer=ctx_tokenizer,
         question_tokenizer=question_tokenizer,
         dataset_config=dataset_config,
-        dataset_type="train",
+        # dataset_type="train",
     )
     data_collator = DataCollator(
         ctx_tokenizer=ctx_tokenizer, question_tokenizer=question_tokenizer
     )
     return dict(
         train_dataset=train_dataset, eval_dataset=None, data_collator=data_collator
+    )
+
+def test_data_module(
+    ctx_tokenizer: transformers.PreTrainedTokenizer,
+    question_tokenizer: transformers.PreTrainedTokenizer,
+    dataset_config,
+) -> Dict:
+    """Make dataset and collator for supervised fine-tuning."""
+
+    if dataset_config.eval_docs == "":
+        print(f"%% Working on Distractor Setting!")
+        eval_dataset = ALCE_Top100_Dataset(
+            ctx_tokenizer=ctx_tokenizer,
+            question_tokenizer=question_tokenizer,
+            dataset_config=dataset_config,
+        )
+        ctx_dataset = ALCE_Top100_EmbedDataset(
+            ctx_tokenizer=ctx_tokenizer,
+            question_tokenizer=question_tokenizer,
+            dataset_config=dataset_config,
+        )
+    else:
+        print(f"%% Working on Full Setting!")
+        eval_dataset = ALCE_Top100_FullDataset(
+            ctx_tokenizer=ctx_tokenizer,
+            question_tokenizer=question_tokenizer,
+            dataset_config=dataset_config,
+        )
+        ctx_dataset = ALCE_Top100_FullEmbedDataset(
+            ctx_tokenizer=ctx_tokenizer,
+            question_tokenizer=question_tokenizer,
+            dataset_config=dataset_config,
+        )
+    data_collator = DataCollator(
+        ctx_tokenizer=ctx_tokenizer, question_tokenizer=question_tokenizer
+    )
+    return dict(
+        eval_dataset=eval_dataset, ctx_dataset=ctx_dataset, data_collator=data_collator
     )
 

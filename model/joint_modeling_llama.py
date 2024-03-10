@@ -108,10 +108,6 @@ class JointModel(LlamaForCausalLM):
     def set_input_embeddings(self, value):
         self.model.embed_tokens = value
 
-    """
-    test time에 np embedding을 불러올 때 (load_np_head가 True때일 때는 load 아닐 때는 다 dumping해서 즉, encoder forward pass해서 저장)
-    """
-
     def set_ids2text(self, ids2text):
         self.ids2text = ids2text
 
@@ -144,8 +140,6 @@ class JointModel(LlamaForCausalLM):
                 target_ids.to(self.ctx_encoder.device),
                 attention_mask=target_attention_mask.to(self.ctx_encoder.device),
             ).last_hidden_state[:, -1, :].contiguous()
-            if self.train_config.ctx_proj_layer:
-                embs = self.ctx_proj_layer(embs)
             embs = embs.to(self.model.device)
             assert embs.shape[-1] == self.config.hidden_size
         else:
@@ -157,8 +151,6 @@ class JointModel(LlamaForCausalLM):
                 hard_neg_ids.to(self.ctx_encoder.device),
                 attention_mask=hard_neg_mask.to(self.ctx_encoder.device),
             ).last_hidden_state[:, -1, :].contiguous()
-            if self.train_config.ctx_proj_layer:
-                hard_neg_embs = self.ctx_proj_layer(hard_neg_embs)
             hard_neg_embs = hard_neg_embs.to(self.model.device)
             assert hard_neg_embs.shape[-1] == self.config.hidden_size
             # print("hardneg embs  size: ", hard_neg_embs.shape)
@@ -189,9 +181,6 @@ class JointModel(LlamaForCausalLM):
                 .last_hidden_state[:, -1, :]
                 .contiguous()
             )
-            if self.train_config.ctx_proj_layer:
-                embs = self.ctx_proj_layer(embs)
-
             # print(f"[{torch.cuda.current_device()}] embs.shape: {embs.shape}")
             assert embs.shape[-1] == self.config.hidden_size
             size = torch.LongTensor([embs.shape[0]]).to(self.ctx_encoder.device)
@@ -252,34 +241,8 @@ class JointModel(LlamaForCausalLM):
                         item[:length].detach().to(self.ctx_encoder.device)
                     )
             all_gathered_embs = torch.cat(gather_embs, dim=0)
-        # print("embs  size: ", torch.cuda.current_device(), embs.shape)
-            # print(f"[{torch.cuda.current_device()}] shape of all_gathered_embs: {all_gathered_embs.shape}")
 
         all_gathered_hardneg_embs = None
-        # if hard_neg_ids is not None:
-        #     hard_neg_embs = self.ctx_encoder(hard_neg_ids.to(self.ctx_encoder.device), attention_mask=hard_neg_mask.to(self.ctx_encoder.device)).last_hidden_state[:,-1,:].contiguous()
-        #     if self.train_config.ctx_proj_layer:
-        #         hard_neg_embs = self.ctx_proj_layer(hard_neg_embs)
-
-        #     assert hard_neg_embs.shape[-1] == self.config.hidden_size
-        #     hardneg_size = hard_neg_embs.shape[0]
-        # else:
-        #     hard_neg_embs = self.ctx_encoder(torch.zeros([1, 100], dtype=torch.int64).to(self.ctx_encoder.device)).last_hidden_state[:,-1,:].contiguous()
-        #     hard_neg_embs=None
-        #     hardneg_size = 0
-        # gathered_hardneg_length = [torch.zeros_like(hardneg_size).to(self.ctx_encoder.device) for _ in range(torch.distributed.get_world_size())]
-        # torch.distributed.all_gather(gathered_hardneg_length, hardneg_size)
-        # gathered_hardneg_length_int = []
-        # for item in gathered_hardneg_length:
-        #     gathered_hardneg_length_int.append(int(item[0].item()))
-        # if sum(gathered_hardneg_length_int)==0:
-        #     all_gathered_hardneg_embs=None
-        # else:
-        #     gathered_hardneg_embs = [torch.zeros_like(hard_neg_embs).to(self.ctx_encoder.device) for _ in range(torch.distributed.get_world_size())]
-        #     torch.distributed.all_gather(gathered_hardneg_embs, hard_neg_embs)
-        #     gather_hardneg_embs = [item.detach().to(self.ctx_encoder.device) for item,length  in zip(gathered_hardneg_embs, gathered_hardneg_length_int) if (item is not None and item.device!=self.ctx_encoder.device and length>0)]
-        #     all_gathered_hardneg_embs = torch.cat(gather_hardneg_embs, dim=0)
-
         if target_ids is not None:
             return embs, all_gathered_embs, all_gathered_hardneg_embs
         else:
@@ -320,13 +283,9 @@ class JointModel(LlamaForCausalLM):
                 if input_ids[i][target_idx] != self.vanilla_vocab_size - 1:
                     assert False
                 target = last_hidden_states[i, target_idx, :]
-                if self.train_config.question_proj_layer:
-                    target = self.question_proj_layer(target)
                 target_emb_list.append(target)
 
         target_embs = torch.stack(target_emb_list)
-        # print(target_embs.shape, last_hidden_states[:, -1, :].shape)
-        # assert target_embs.shape==last_hidden_states[:, -1, :].shape
 
         return target_embs
 
@@ -477,75 +436,26 @@ class JointModel(LlamaForCausalLM):
             assert cnt == 0
             question_embs = None
         if question_embs != None:
-            if self.train_config.memory_bank_length > 0:
-                assert False
-                if (
-                    torch.is_tensor(ctx_memory_bank)
-                    and ctx_memory_bank.shape[0]
-                    <= self.train_config.memory_bank_length - batch_size
-                ):
-                    all_embs = torch.cat([all_embs, ctx_memory_bank], dim=0)
-                ctx_memory_bank = all_embs.detach()
             scores = torch.matmul(
                 question_embs, torch.transpose(all_embs, 0, 1)
             )
-            if self.train_config.compare:
-                assert False
-                np_loss_list = []
-                cnt_batch = []
-                cnt = 0
-                correct_predictions_count = 0
-                for target_idx in batch["target_idxs"]:
-                    cnt_batch.append((cnt, cnt + len(target_idx)))
-                    cnt += len(target_idx)
-                for start, end in cnt_batch:
-                    for i in range(start, end):
-                        candidate_list = []
-                        for idx in range(scores.shape[1]):
-                            if idx < start or idx >= end:
-                                candidate_list.append(idx)
-                            elif idx == i:
-                                candidate_list.append(idx)
-                        labels = torch.tensor([start], device=scores.device)
-                        # print(f'Score_matrix size: {scores[i, candidate_list].shape}')
-                        np_logits = F.log_softmax(
-                            scores[i, candidate_list].unsqueeze(0)
-                        )
-                        np_loss = F.nll_loss(
-                            np_logits, labels, reduction="mean"
-                        )
-                        np_loss_list.append(np_loss)
-                        max_score, max_idxs = torch.max(np_logits, 1)
-                        correct_predictions_count += (
-                            max_idxs == torch.tensor(labels).to(max_idxs.device)
-                        ).sum()
-                np_loss = sum(np_loss_list) / len(np_loss_list)
-                print(f"np loss : {np_loss}")
-                loss += np_loss / self.train_config.np_weight
+            print(f"Score_matrix size: {scores.size()}")
 
-            else:
-                print(f"Score_matrix size: {scores.size()}")
-
-                np_logits = F.log_softmax(scores, dim=1)
-                labels = torch.tensor(
-                    [i for i in range(np_logits.shape[0])], device=scores.device
-                )
-                np_loss = F.nll_loss(np_logits, labels, reduction="mean")
-                print(f"np loss : {np_loss}")
-                loss += np_loss / self.train_config.np_weight
-                max_score, max_idxs = torch.max(np_logits, 1)
-                correct_predictions_count = (
-                    max_idxs == torch.tensor(labels).to(max_idxs.device)
-                ).sum()
+            np_logits = F.log_softmax(scores, dim=1)
+            labels = torch.tensor(
+                [i for i in range(np_logits.shape[0])], device=scores.device
+            )
+            np_loss = F.nll_loss(np_logits, labels, reduction="mean")
+            print(f"np loss : {np_loss}")
+            loss += np_loss / self.train_config.np_weight
+            max_score, max_idxs = torch.max(np_logits, 1)
+            correct_predictions_count = (
+                max_idxs == torch.tensor(labels).to(max_idxs.device)
+            ).sum()
             
             print(
                 f"correct: {correct_predictions_count} || total:{question_embs.shape[0]} || # of ctx: {scores.shape[1]} || ret acc: {correct_predictions_count/question_embs.shape[0]}",
             )
-        if not return_dict:
-            assert False
-            output = (logits,) + outputs[1:]
-            return (loss,) + output if loss is not None else output
-
 
         return CausalLMOutputWithPast(
             loss=loss,

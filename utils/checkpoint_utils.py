@@ -140,6 +140,26 @@ def save_optimizer_checkpoint(model, optimizer, rank, cfg, epoch=1):
 
         print(f"--> saved {opt_save_full_path} to disk")
 
+def load_sharded_model_single_gpu(model,model_path):
+    
+    reader = FileSystemReader(model_path)
+    
+    state_dict = {
+        "model": model.state_dict()
+    }
+    
+    dist_cp.load_state_dict(
+                state_dict=state_dict,
+                storage_reader= FileSystemReader(model_path),
+                no_dist=True,
+            )
+    
+    model.load_state_dict(state_dict["model"])
+    
+    print(f"Sharded state checkpoint loaded from {model_path}")
+    return model
+
+
 def load_sharded_split_single_gpu(model,ctx_model, question_model, model_path):    
     state_dict = {
         "model": model.state_dict()

@@ -8,7 +8,7 @@ def sample_dict(dictionary, number):
     return sampled
 
 def add_instruction_rettoken(
-    data_path, data_type, do_swap, dataset_config
+    data_path, dataset_config
 ):
     data_list = []
     if data_path.endswith(".csv"):

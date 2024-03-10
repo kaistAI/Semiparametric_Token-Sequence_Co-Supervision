@@ -1,0 +1,4 @@
+wandb
+*.pyc
+__pycache__
+dataset/finetuning_dataset
