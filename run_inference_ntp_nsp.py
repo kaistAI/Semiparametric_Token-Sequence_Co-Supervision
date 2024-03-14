@@ -49,10 +49,12 @@ def main(**kwargs):
         train_config.dist_checkpoint_root_folder,
         train_config.dist_checkpoint_folder + "-" + train_config.model_name,
     )
-    print(model_ckpt_path)
-    assert os.path.isdir(
+    if os.path.isdir(
         model_ckpt_path
-    ), f"{model_ckpt_path} Model Checkpoint Path corresponding to the given config does not exist!"
+    ):
+        print(f"We will preceed inference corresponding to the model saved in {model_ckpt_path}.")
+    else:
+        print(f"{model_ckpt_path} does not exist, but don't worry! We will proceed inference with the huggingface model that we provide! Emb_seq: (https://huggingface.co/kaist-ai/cosupervision-emb_seq-Llama2_7b) and Gen: (https://huggingface.co/kaist-ai/cosupervision-gen-Llama2_7b).")
 
     accelerator = Accelerator()
     # Set the seeds for reproducibility
@@ -414,14 +416,14 @@ def prepare(train_config,dataset_config, model_ckpt_path, type, kwargs):
     if type == "ctx":
         model = LlamaModel.from_pretrained(
             # train_config.model_name,
-            model_ckpt_path,
+            model_ckpt_path if os.path.isdir(model_ckpt_path) else "kaist-ai/cosupervision-emb_seq-Llama2_7b",
             load_in_8bit=True if train_config.quantization else None,
             device_map="auto" if train_config.quantization else None,
         )
     else:
         model = LlamaForCausalLM.from_pretrained(
             # train_config.model_name,
-            model_ckpt_path,
+            model_ckpt_path if os.path.isdir(model_ckpt_path) else "kaist-ai/cosupervision-gen-Llama2_7b",
             load_in_8bit=True if train_config.quantization else None,
             device_map="auto" if train_config.quantization else None,
         )

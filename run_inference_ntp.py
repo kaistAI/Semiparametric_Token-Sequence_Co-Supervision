@@ -51,12 +51,25 @@ def main(**kwargs):
         train_config.dist_checkpoint_root_folder,
         train_config.dist_checkpoint_folder + "-" + train_config.model_name,
     )
+    if os.path.isdir(
+        model_ckpt_path
+    ):
+        print(f"We will preceed inference corresponding to the model saved in {model_ckpt_path}.")
+    else:
+        print(f"{model_ckpt_path} does not exist, but don't worry! We will proceed inference with the huggingface model that we provide for Gen!")
 
 
 
     retriever_ckpt_path = os.path.join(
         train_config.dist_checkpoint_root_folder, train_config.ret_checkpoint_folder
     )
+    if os.path.isdir(
+        retriever_ckpt_path
+    ):
+        print(f"We will preceed inference corresponding to the model saved in {retriever_ckpt_path}.")
+    else:
+        print(f"{retriever_ckpt_path} does not exist, but don't worry! We will proceed inference with the huggingface model that we provide for Emb_seq!")
+
     torch.cuda.manual_seed(train_config.seed)
     torch.manual_seed(train_config.seed)
 
@@ -544,7 +557,7 @@ def prepare_llama(
             print(f"[single] Loading Llama ctx encoder")
             model = LlamaModel.from_pretrained(
                 # train_config.model_name,
-                retriever_ckpt_path,
+                retriever_ckpt_path if os.path.isdir(retriever_ckpt_path) else "kaist-ai/separate_supervision-emb_seq-Llama2_7b",
                 # train_config,
                 load_in_8bit=True if train_config.quantization else None,
                 device_map="auto" if train_config.quantization else None,
@@ -562,21 +575,21 @@ def prepare_llama(
             model.resize_token_embeddings(len(eval_tokenizer))
             # model = model.ctx_encoder
     elif type == "question":
-        if not train_config.single:
-            print(f"[dual] Loading Llama Q encoder")
+        if train_config.single:
+            print(f"[single] Loading Llama Q encoder")
             q_model = LlamaModel.from_pretrained(
                 # train_config.model_name,
-                retriever_ckpt_path,
+                retriever_ckpt_path if os.path.isdir(retriever_ckpt_path) else "kaist-ai/separate_supervision-emb_seq-Llama2_7b",
                 # train_config,
                 load_in_8bit=True if train_config.quantization else None,
                 device_map="auto" if train_config.quantization else None,
             )
             q_model.resize_token_embeddings(len(eval_tokenizer))
         else:
-            print(f"[single] Loading Llama q encoder")
+            print(f"[dual] Loading Llama q encoder")
             q_model = LlamaModel.from_pretrained(
                 # train_config.model_name,
-                retriever_ckpt_path,
+                os.path.join(retriever_ckpt_path, "question"),
                 # train_config,
                 load_in_8bit=True if train_config.quantization else None,
                 device_map="auto" if train_config.quantization else None,
@@ -586,7 +599,7 @@ def prepare_llama(
         print(f"Loading LlamaForCausalLM")
         model = LlamaForCausalLM.from_pretrained(
             # train_config.model_name,
-            model_ckpt_path,
+            model_ckpt_path if os.path.isdir(model_ckpt_path) else "kaist-ai/separate_supervision-gen-Llama2_7b",
             load_in_8bit=True if train_config.quantization else None,
             device_map="auto" if train_config.quantization else None,
         )
