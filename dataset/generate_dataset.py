@@ -181,7 +181,7 @@ def get_mask_idx(input_ids, tokenizer):
     return mask_idx
 
 
-class ALCE_Top100_Dataset(Dataset):
+class Top100_Dataset(Dataset):
     """Dataset for supervised fine-tuning."""
 
     def __init__(
@@ -190,7 +190,7 @@ class ALCE_Top100_Dataset(Dataset):
         question_tokenizer: transformers.PreTrainedTokenizer,
         dataset_config,
     ):
-        super(ALCE_Top100_Dataset, self).__init__()
+        super(Top100_Dataset, self).__init__()
         instructions = TASK_INST[dataset_config.task]
         input_path = dataset_config.eval_data
         if input_path.endswith(".json"):
@@ -201,49 +201,18 @@ class ALCE_Top100_Dataset(Dataset):
             with jsonlines.open(input_path, "r") as jsonl_f:
                 input_data = [obj for obj in jsonl_f]
 
-        if dataset_config.rag_ctx_q:
-            self.prompt = _tokenize_fn(
-                tqdm(
-                    [
-                        instructions
-                        + "## Context: [Ret]"
-                        + item["docs"][0]["text"]
-                        + "## Input:\n\n"
-                        + item["question"]
-                        + "## Output:\n\n"
-                        for item in input_data
-                    ]
-                ),
-                question_tokenizer,
-            )["input_ids"]
-        elif dataset_config.rag_q_ctx:
-            self.prompt = _tokenize_fn(
-                tqdm(
-                    [
-                        instructions
-                        + "## Input:\n\n"
-                        + item["question"]
-                        + "## Context: [Ret]"
-                        + item["docs"][0]["text"]
-                        + "## Output:\n\n"
-                        for item in input_data
-                    ]
-                ),
-                question_tokenizer,
-            )["input_ids"]
-        else:
-            self.prompt = _tokenize_fn(
-                tqdm(
-                    [
-                        instructions
-                        + "## Input:\n\n"
-                        + item["question"]
-                        + "## Output:\n\n"
-                        for item in input_data
-                    ]
-                ),
-                question_tokenizer,
-            )["input_ids"]
+        self.prompt = _tokenize_fn(
+            tqdm(
+                [
+                    instructions
+                    + "## Input:\n\n"
+                    + item["question"]
+                    + "## Output:\n\n"
+                    for item in input_data
+                ]
+            ),
+            question_tokenizer,
+        )["input_ids"]
 
         self.ids = [
             [doc["id"] for doc in item["docs"][: dataset_config.ndocs]]
@@ -261,7 +230,7 @@ class ALCE_Top100_Dataset(Dataset):
         )
 
 
-class ALCE_Top100_FullDataset(Dataset):
+class Top100_FullDataset(Dataset):
     """Dataset for supervised fine-tuning."""
 
     def __init__(
@@ -270,7 +239,7 @@ class ALCE_Top100_FullDataset(Dataset):
         question_tokenizer: transformers.PreTrainedTokenizer,
         dataset_config,
     ):
-        super(ALCE_Top100_FullDataset, self).__init__()
+        super(Top100_FullDataset, self).__init__()
         instructions = TASK_INST[dataset_config.task]
         input_path = dataset_config.eval_data
         if input_path.endswith(".json"):
@@ -280,49 +249,18 @@ class ALCE_Top100_FullDataset(Dataset):
 
             with jsonlines.open(input_path, "r") as jsonl_f:
                 input_data = [obj for obj in jsonl_f]
-        if dataset_config.rag_ctx_q:
-            self.prompt = _tokenize_fn(
-                tqdm(
-                    [
-                        instructions
-                        + "## Context: [Ret]"
-                        + item["docs"][0]["text"]
-                        + "## Input:\n\n"
-                        + item["question"]
-                        + "## Output:\n\n"
-                        for item in input_data
-                    ]
-                ),
-                question_tokenizer,
-            )["input_ids"]
-        elif dataset_config.rag_q_ctx:
-            self.prompt = _tokenize_fn(
-                tqdm(
-                    [
-                        instructions
-                        + "## Input:\n\n"
-                        + item["question"]
-                        + "## Context: [Ret]"
-                        + item["docs"][0]["text"]
-                        + "## Output:\n\n"
-                        for item in input_data
-                    ]
-                ),
-                question_tokenizer,
-            )["input_ids"]
-        else:
-            self.prompt = _tokenize_fn(
-                tqdm(
-                    [
-                        instructions
-                        + "## Input:\n\n"
-                        + item["question"]
-                        + "## Output:\n\n"
-                        for item in input_data
-                    ]
-                ),
-                question_tokenizer,
-            )["input_ids"]
+        self.prompt = _tokenize_fn(
+            tqdm(
+                [
+                    instructions
+                    + "## Input:\n\n"
+                    + item["question"]
+                    + "## Output:\n\n"
+                    for item in input_data
+                ]
+            ),
+            question_tokenizer,
+        )["input_ids"]
 
         self.ids = []
         for elem in json.load(open(dataset_config.eval_docs)):
@@ -339,7 +277,7 @@ class ALCE_Top100_FullDataset(Dataset):
         )
 
 
-class ALCE_Top100_FullEmbedDataset(Dataset):
+class Top100_FullEmbedDataset(Dataset):
     """Dataset for supervised fine-tuning."""
 
     def __init__(
@@ -348,7 +286,7 @@ class ALCE_Top100_FullEmbedDataset(Dataset):
         question_tokenizer: transformers.PreTrainedTokenizer,
         dataset_config,
     ):
-        super(ALCE_Top100_FullEmbedDataset, self).__init__()
+        super(Top100_FullEmbedDataset, self).__init__()
         input_path = dataset_config.eval_docs
         if input_path.endswith(".json"):
             input_data = json.load(open(input_path))
@@ -379,7 +317,7 @@ class ALCE_Top100_FullEmbedDataset(Dataset):
         )
 
 
-class ALCE_Top100_EmbedDataset(Dataset):
+class Top100_EmbedDataset(Dataset):
     """Dataset for supervised fine-tuning."""
 
     def __init__(
@@ -388,7 +326,7 @@ class ALCE_Top100_EmbedDataset(Dataset):
         question_tokenizer: transformers.PreTrainedTokenizer,
         dataset_config,
     ):
-        super(ALCE_Top100_EmbedDataset, self).__init__()
+        super(Top100_EmbedDataset, self).__init__()
         input_path = dataset_config.eval_data
         if input_path.endswith(".json"):
             input_data = json.load(open(input_path))
@@ -721,24 +659,24 @@ def test_data_module(
 
     if dataset_config.eval_docs == "":
         print(f"%% Working on Distractor Setting!")
-        eval_dataset = ALCE_Top100_Dataset(
+        eval_dataset = Top100_Dataset(
             ctx_tokenizer=ctx_tokenizer,
             question_tokenizer=question_tokenizer,
             dataset_config=dataset_config,
         )
-        ctx_dataset = ALCE_Top100_EmbedDataset(
+        ctx_dataset = Top100_EmbedDataset(
             ctx_tokenizer=ctx_tokenizer,
             question_tokenizer=question_tokenizer,
             dataset_config=dataset_config,
         )
     else:
         print(f"%% Working on Full Setting!")
-        eval_dataset = ALCE_Top100_FullDataset(
+        eval_dataset = Top100_FullDataset(
             ctx_tokenizer=ctx_tokenizer,
             question_tokenizer=question_tokenizer,
             dataset_config=dataset_config,
         )
-        ctx_dataset = ALCE_Top100_FullEmbedDataset(
+        ctx_dataset = Top100_FullEmbedDataset(
             ctx_tokenizer=ctx_tokenizer,
             question_tokenizer=question_tokenizer,
             dataset_config=dataset_config,

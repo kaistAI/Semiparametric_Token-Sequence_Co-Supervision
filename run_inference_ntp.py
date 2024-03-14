@@ -45,7 +45,7 @@ def main(**kwargs):
 
     # Update the configuration for the training and sharding process
     update_config((train_config, fsdp_config), **kwargs)
-
+    train_config.ret_checkpoint_folder = kwargs["ret_checkpoint_folder"]
     # Loading Model Checkpoints (If Checkpoint is in .distcp files, first convert into HF .bin files, and delete .distcp files)
     model_ckpt_path = os.path.join(
         train_config.dist_checkpoint_root_folder,

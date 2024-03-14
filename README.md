@@ -60,9 +60,9 @@ CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 torchrun --nnodes 1 --master_port=29100 --n
 ```
 We also provide the result model of both [Emb_seq](https://huggingface.co/kaist-ai/separate_supervision-emb_seq-Llama2_7b) and [Gen](https://huggingface.co/kaist-ai/separate_supervision-gen-Llama2_7b).
 # 2.3. Inference
+Specify dist_checkpoint_folder and ret_checkpoint_folder as a local model ckpt path for both Gen and Emb_seq, respectively.(If your local model path is not well specified, the code will automatically download the huggifngface ckpt that we provide to proceed the inference stage.)
 Modify the --dataset argument to experiment on different dataset.
 ```
 CUDA_VISIBLE_DEVICES=0 accelerate launch run_inference_ntp.py --dataset kilt_hotpotqa --dist_checkpoint_folder gen_ntp_singlesupervision --ret_checkpoint_folder emb_single_ntp_singlesupervision --ndocs 100 --retriever llama --single
 ```
 
-If your local model path is not well specified, the code will automatically download the huggifngface ckpt that we provide to proceed the inference stage.

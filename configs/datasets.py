@@ -25,8 +25,6 @@ class kilt_fever:
     ctx_truncate: bool = False
     task: str = "fever"
     max_new_tokens: int = 300
-    rag_ctx_q: bool = False
-    rag_q_ctx: bool = False
 
 
 @dataclass
@@ -38,8 +36,6 @@ class kilt_wow:
     ctx_truncate: bool = False
     task: str = "wow"
     max_new_tokens: int = 300
-    rag_ctx_q: bool = False
-    rag_q_ctx: bool = False
 
 @dataclass
 class kilt_zsre:
@@ -50,8 +46,6 @@ class kilt_zsre:
     ctx_truncate: bool = False
     task: str = "zsre"
     max_new_tokens: int = 300
-    rag_ctx_q: bool = False
-    rag_q_ctx: bool = False
 
 
 @dataclass
@@ -63,8 +57,6 @@ class kilt_trex:
     ctx_truncate: bool = False
     task: str = "trex"
     max_new_tokens: int = 300
-    rag_ctx_q: bool = False
-    rag_q_ctx: bool = False
 
 @dataclass
 class kilt_zsre:
@@ -75,8 +67,6 @@ class kilt_zsre:
     ctx_truncate: bool = False
     task: str = "zsre"
     max_new_tokens: int = 300
-    rag_ctx_q: bool = False
-    rag_q_ctx: bool = False
 
 
 @dataclass
@@ -88,8 +78,6 @@ class kilt_trex:
     ctx_truncate: bool = False
     task: str = "trex"
     max_new_tokens: int = 300
-    rag_ctx_q: bool = False
-    rag_q_ctx: bool = False
 
 @dataclass
 class kilt_eli5:
@@ -100,8 +88,6 @@ class kilt_eli5:
     ctx_truncate: bool = False
     task: str = "eli5"
     max_new_tokens: int = 300
-    rag_ctx_q: bool = False
-    rag_q_ctx: bool = False
 
 
 @dataclass
@@ -113,8 +99,6 @@ class kilt_triviaqa:
     ctx_truncate: bool = False
     task: str = "triviaqa"
     max_new_tokens: int = 300
-    rag_ctx_q: bool = False
-    rag_q_ctx: bool = False
 
 @dataclass
 class kilt_nq:
@@ -125,5 +109,3 @@ class kilt_nq:
     ctx_truncate: bool = False
     task: str = "nq"
     max_new_tokens: int = 300
-    rag_ctx_q: bool = False
-    rag_q_ctx: bool = False

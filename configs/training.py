@@ -11,8 +11,8 @@ class training_config:
     num_epochs: int = 3
     lr: float = 2e-5
     gamma: float = 0.85
-    dist_checkpoint_root_folder: str = "model_checkpoints",
-    dist_checkpoint_folder: str = "ntp_nsp_cosupervision",
+    dist_checkpoint_root_folder: str = "model_checkpoints"
+    dist_checkpoint_folder: str = "ntp_nsp_cosupervision"
     enable_fsdp: bool = True
     batch_size_training: int = 8
     micro_batch_size: int = 8
