@@ -7,6 +7,7 @@ import transformers
 import json, copy
 from tqdm import tqdm
 from utils.dataset_utils import add_instruction_rettoken
+
 IGNORE_INDEX = -100
 TASK_INST = {
     "wow": "Given a chat history separated by new lines, generates an informative, knowledgeable and engaging response. ",
@@ -157,6 +158,7 @@ def preprocess(
             mask_idx = get_mask_idx(input_id, question_tokenizer)      
             label[mask_idx] = IGNORE_INDEX
             cnt = list(label).count(IGNORE_INDEX)
+
     print("Tokenizing All done!")
     return dict(
         input_ids=input_ids,
@@ -445,7 +447,7 @@ class TrainDataset(Dataset):
         self.target_labels = target_labels
         self.hard_neg_labels = hard_neg_labels
         do_print(
-            f"####### Example dataset..\nsource: {sources[0]}\ninput_ids: {self.input_ids[0]}\nlabels: {self.labels[0]}\nmask_idx: {self.mask_idx}"
+            f"####### Example dataset..\nsource: {sources[0]}\ninput_ids: {self.input_ids[0]}\nlabels: {self.labels[0]}"
         )
         
 
@@ -458,7 +460,6 @@ class TrainDataset(Dataset):
                 input_ids=self.input_ids[i],
                 labels=self.labels[i],
                 target_labels=self.target_labels[i],
-                mask_idx=self.mask_idx[i]
             )
         elif self.hard_neg_ids is None:
             return dict(
@@ -467,7 +468,6 @@ class TrainDataset(Dataset):
                 target_ids=self.target_ids[i],
                 target_idxs=self.target_idxs[i],
                 target_labels=self.target_labels[i],
-                mask_idx=self.mask_idx[i],
             )
         else:
             return dict(
@@ -478,7 +478,6 @@ class TrainDataset(Dataset):
                 hard_neg_ids=self.hard_neg_ids[i],
                 target_labels=self.target_labels[i],
                 hard_neg_labels=self.hard_neg_labels[i],
-                mask_idx=self.mask_idx[i],
             )
 
 @dataclass
