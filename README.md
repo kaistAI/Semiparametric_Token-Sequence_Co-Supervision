@@ -1,6 +1,6 @@
 # Semiparametric Token Sequence Cosupervision
 
-This is the official codebase of [Semiparametric Token Sequence Cosupervision](https://arxiv.org/abs/2403.09024). The repository provides the train and inference code of our main experiment, which is as follows:
+[ACL 2024] This is the official codebase of [Semiparametric Token Sequence Cosupervision](https://arxiv.org/abs/2403.09024). The repository provides the train and inference code of our main experiment, which is as follows:
 
 1. Train/inference NTP+NSP(Ours)
 2. Train/inference NTP(baseline)
